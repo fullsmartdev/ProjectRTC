@@ -10,7 +10,7 @@ function RTCconnection(id, parent) {
     console.log('receiving ' + message.type + ' from ' + message.from);
     switch (message.type) {
     case 'offer':
-        self.pc.addStream(parent.getStream(message.to));
+        self.pc.addStream(parent.localStream);
         this.pc.setRemoteDescription(new RTCSessionDescription(message.payload));
         this.answer();
         break;
@@ -39,7 +39,7 @@ function RTCconnection(id, parent) {
   };
   
   this.initPeerConnection = function() {
-    self.pc = new RTCPeerConnection(parent.config.peerConnectionConfig, parent.config.peerConnectionConstraints);
+    self.pc = new RTCPeerConnection(self.parent.config.peerConnectionConfig, self.parent.config.peerConnectionConstraints);
     self.pc.onicecandidate = function(event) {
       if (event.candidate) {
         self.send('candidate', {
@@ -54,7 +54,6 @@ function RTCconnection(id, parent) {
       parent.remoteVideosContainer.appendChild(self.remoteVideoEl);
       attachMediaStream(self.remoteVideoEl, event.stream);
       self.remoteVideoEl.controls = 'controls';
-      self.parent.connection.emit('complete', self.id);
     };
   };
   
@@ -131,25 +130,17 @@ function RTCclient () {
   this.localVideoEl = document.getElementById('localVideo');
   this.remoteVideosContainer = document.getElementById('remoteVideosContainer');
   
-  this.getStream = function(id){
-    var StreamId = self.getStreamById(id);
-    if (StreamId === -1) {
-      return self.localStream;
-    } 
-    return self.availableStreams()[peerId].getRemoteStreams()[0];
-  }
-  
   this.connection = io.connect(this.config.url);
   
   this.connection.on('message', function (message) {
       var streamId = self.getStreamById(message.from);
       if (streamId === -1) {
         var stream = new RTCconnection(message.from, self);
-        self.availableStreams().push(stream);
+        self.availableStreams().push(peer);
       } else {
-        stream = self.availableStreams()[streamId];
+        peer = self.availableStreams()[peerId];
       }
-      stream.handleMessage(message);
+      peer.handleMessage(message);
   });
     
   this.connection.on('readyToJoin', function() {
@@ -213,7 +204,7 @@ function RTCclient () {
       // Load initial state from server
       $.getJSON("/streams", function(allData) {
         var mappedStreams = $.map(allData, function(data) { 
-          return new RTCconnection(data.seed, self);
+          return new RTCconnection(data.id, self);
         });
         self.availableStreams(mappedStreams);
       }); 

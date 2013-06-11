@@ -27,9 +27,8 @@ if ('development' == app.get('env')) {
   app.use(express.errorHandler());
 }
 
-// routing
-app.get('/', routes.index); 
-app.get('/peers', routes.peers);
+app.get('/', routes.index);
+app.get('/streams', routes.streams);
 
 server.listen(app.get('port'), function(){
   console.log('Express server listening on port ' + app.get('port'));
@@ -40,24 +39,21 @@ io.sockets.on('connection', function(client) {
    	
   // pass a message
   client.on('message', function (details) {
-    var otherClient = io.sockets.sockets[routes.getNextNode(details.to)];
+    var otherClient = io.sockets.sockets[details.to];
 
     if (!otherClient) {
       return;
     }
+      delete details.to;
       details.from = client.id;
       otherClient.emit('message', details);
-  });
-  
-  client.on('complete', function(seed) {
-    routes.addNode(client.id, seed);
   });
 
   client.on('join', function(name) {
     
     console.log('-- ' + client.id + ' joined ' + name + ' --');
     if (name === 'sRoom') {
-      routes.addPeer(client.id);
+      routes.addStream(client.id);
     }
     client.join(name);
   });
@@ -69,7 +65,7 @@ io.sockets.on('connection', function(client) {
 
   function leave() {
     console.log('-- ' + client.id + ' leaved --');
-    routes.removePeer(client.id);
+    routes.removeStream(client.id);
   }
 
   client.on('disconnect', leave);
